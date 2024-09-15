@@ -1,0 +1,104 @@
+<!-- Courtesy of Claude -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smooth Zoomable and Pannable SVG Viewer</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #svg-container { width: 100%; height: 100vh; cursor: move; }
+    </style>
+</head>
+<body>
+    <div id="svg-container">
+        <!-- SVG content will be loaded here -->
+    </div>
+
+    <script>
+        const container = document.getElementById('svg-container');
+        let svg, viewBox = { x: 0, y: 0, width: 100, height: 100 };
+        let isPanning = false;
+        let startPoint = { x: 0, y: 0 };
+
+        // Load the SVG file
+        fetch('transformers.svg')
+            .then(response => response.text())
+            .then(svgContent => {
+                container.innerHTML = svgContent;
+                svg = container.querySelector('svg');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', '100%');
+                
+                // Get initial viewBox
+                const initialViewBox = svg.getAttribute('viewBox');
+                if (initialViewBox) {
+                    const [x, y, width, height] = initialViewBox.split(' ').map(Number);
+                    viewBox = { x, y, width, height };
+                }
+
+                // Add event listeners
+                svg.addEventListener('wheel', zoom);
+                svg.addEventListener('mousedown', startPan);
+                svg.addEventListener('mousemove', pan);
+                svg.addEventListener('mouseup', endPan);
+                svg.addEventListener('mouseleave', endPan);
+            })
+            .catch(error => console.error('Error loading SVG:', error));
+
+        function zoom(event) {
+            event.preventDefault();
+            
+            const scale = event.deltaY > 0 ? 1.1 : 0.9;
+            const point = getPointFromEvent(event);
+            
+            viewBox.width *= scale;
+            viewBox.height *= scale;
+            viewBox.x = point.x - (point.x - viewBox.x) * scale;
+            viewBox.y = point.y - (point.y - viewBox.y) * scale;
+            
+            updateViewBox();
+        }
+
+        function startPan(event) {
+            isPanning = true;
+            startPoint = { x: event.clientX, y: event.clientY };
+        }
+
+        function pan(event) {
+            if (!isPanning) return;
+            
+            const dx = event.clientX - startPoint.x;
+            const dy = event.clientY - startPoint.y;
+            
+            // Calculate the movement in SVG coordinates
+            const svgRect = svg.getBoundingClientRect();
+            const scaleX = viewBox.width / svgRect.width;
+            const scaleY = viewBox.height / svgRect.height;
+            
+            viewBox.x -= dx * scaleX;
+            viewBox.y -= dy * scaleY;
+            
+            updateViewBox();
+            
+            // Update start point for next move
+            startPoint = { x: event.clientX, y: event.clientY };
+        }
+
+        function endPan() {
+            isPanning = false;
+        }
+
+        function getPointFromEvent(event) {
+            const point = svg.createSVGPoint();
+            point.x = event.clientX;
+            point.y = event.clientY;
+            return point.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        function updateViewBox() {
+            svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+        }
+    </script>
+</body>
+</html>
